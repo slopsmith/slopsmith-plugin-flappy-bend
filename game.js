@@ -224,6 +224,11 @@
     if (!sprite) return;
     const scale = pipeW / sprite.width;
     const spriteH = sprite.height * scale;
+    // Guard: if the canvas / container has 0 width, spriteH will be 0 and
+    // the tiling while-loops below would never advance, causing an infinite
+    // loop. Return early — the pipe will be redrawn on the next frame once
+    // layout has settled.
+    if (spriteH <= 0) return;
 
     // Top pipe (above gap): drawn upside-down.
     const topPipeEnd = gapY - gapHalf;
@@ -349,8 +354,10 @@
       _trackIndex = j.tracks || [];
     } catch (e) {
       console.warn('[flappy_bend] track index missing:', e);
-      // Leave _trackIndex as null so a later bootstrap() call can retry
-      // (unlike an empty array, null does not satisfy the !== null guard).
+      // Leave _trackIndex as null so the next startGame() call can retry
+      // via its explicit loadTrackIndex() invocation. (bootstrap() is an
+      // IIFE and will not run again.) null is intentionally distinct from
+      // an empty array so the !== null guard above re-attempts the fetch.
       // Return [] here so callers always get an array.
     }
     return _trackIndex || [];
