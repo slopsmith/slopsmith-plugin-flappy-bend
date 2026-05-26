@@ -254,7 +254,7 @@
     }
   }
 
-  function drawBird(ctx, bird, sprites, pitchActive, started) {
+  function drawBird(ctx, bird, sprites, pitchActive) {
     // Pick a flap frame from the wing phase.
     const phase = ((bird.wingPhase % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     const frame = (phase < (Math.PI * 2 / 3)) ? 'upflap'
@@ -674,8 +674,10 @@
           baselineSettled = true;
           startCountdown();
         }
-      } else if (!baselineSettled && pitchActive && Math.abs(frame.cents) >= 35) {
-        baselineSinceMs = null; // off the baseline; restart wait
+      } else {
+        // Either not pitch-active or the pitch is off the baseline.
+        // Reset the timer so the 250 ms window must be uninterrupted.
+        baselineSinceMs = null;
       }
     });
 
@@ -938,7 +940,7 @@
       const targetRot = Math.max(-0.55, Math.min(0.9, bird.vy * 0.002));
       bird.rotation += (targetRot - bird.rotation) * Math.min(1, dt * 10);
       bird.wingPhase += dt * (started ? (12 + Math.abs(bird.vy) * 0.02) : 8);
-      drawBird(ctx, bird, sprites, pitchActive, started);
+      drawBird(ctx, bird, sprites, pitchActive);
 
       // Score: big sprite numbers at top center (Flappy convention).
       drawScoreNumbers(ctx, W, passed, sprites, { y: Math.round(H * 0.06), scale: 1.4 });
