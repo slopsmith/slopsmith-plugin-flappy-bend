@@ -45,11 +45,9 @@
       .fb-game-root,
       .fb-game-root * {
         font-family: 'Kaph', system-ui, -apple-system, sans-serif !important;
-        /* Kaph ships in Regular + Italic only — block the browser from
-           synthesising a bold variant (looks like mush on a display font),
-           but do NOT force font-weight so Tailwind font-semibold / font-black
-           classes can still control per-element emphasis. */
-        font-synthesis: none;
+        /* Kaph ships in Regular + Italic only. Synthetic bold is allowed so
+           Tailwind font-semibold / font-black classes produce visible emphasis
+           on countdown numbers and labels. */
       }
       .fb-game-root .uppercase {
         letter-spacing: 0.18em;
@@ -520,6 +518,9 @@
   let runState = null;
 
   async function startGame({ container, modifiers, sdk }) {
+    // If bootstrap()'s initial loadTrackIndex() failed transiently,
+    // _trackIndex is still null — retry here before picking a default.
+    if (_trackIndex === null) await loadTrackIndex();
     const trackId = modifiers.track || (_trackIndex && _trackIndex[0] && _trackIndex[0].id);
     if (!trackId) {
       container.innerHTML = '<div class="text-center text-gray-400 pt-20">No tracks installed.</div>';
