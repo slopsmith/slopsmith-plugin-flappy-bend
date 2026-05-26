@@ -540,9 +540,19 @@
     // us for the stream, and its matchNotes loop crashes when called
     // outside a song screen (no highway → no .getTime). v1.1's scoring-
     // core extraction makes this cooperative; for now we just disable it.
+    // Capture whether it was *actively running* so we can restore the same
+    // state on exit — only re-enable if we actually interrupted an active
+    // session (not if note_detect was already stopped before we entered).
+    let noteDetectWasEnabled = false;
     try {
       if (window.noteDetect && typeof window.noteDetect.disable === 'function') {
-        window.noteDetect.disable();
+        const running = typeof window.noteDetect.isRunning === 'function'
+          ? window.noteDetect.isRunning()
+          : true;  // assume running if no isRunning API (safe to re-enable)
+        if (running) {
+          noteDetectWasEnabled = true;
+          window.noteDetect.disable();
+        }
       }
     } catch (e) { console.warn('[flappy_bend] note_detect disable threw:', e); }
 
@@ -656,13 +666,18 @@
     const onResize = () => fitCanvas();
     window.addEventListener('resize', onResize);
 
-    // Stage HUD.
+    // Stage HUD — throttled to re-render only when values change so we
+    // don't force DOM updates at 60 fps.
+    let _hudPassed = -1, _hudErr = '', _hudActive = null;
     function updateHud() {
+      const errStr = meanErrorCents.toFixed(0);
+      if (passed === _hudPassed && errStr === _hudErr && pitchActive === _hudActive) return;
+      _hudPassed = passed; _hudErr = errStr; _hudActive = pitchActive;
       sdk.ui.mountHUD(
         `<span class="mg-pitch-dot ${pitchActive ? 'live' : ''}"></span>` +
         `Pipes <b class="text-white">${passed}</b>` +
         `<span class="mx-2 text-gray-600">·</span>` +
-        `Err <b class="text-white">${meanErrorCents.toFixed(0)}¢</b>`
+        `Err <b class="text-white">${errStr}¢</b>`
       );
     }
 
@@ -786,6 +801,14 @@
       window.removeEventListener('resize', onResize);
       try { pitchHandle.stop(); } catch (e) {}
       try { music && music.stop(); } catch (e) {}
+      // Re-enable note_detect if we disabled it on entry.
+      if (noteDetectWasEnabled) {
+        try {
+          if (window.noteDetect && typeof window.noteDetect.enable === 'function') {
+            window.noteDetect.enable();
+          }
+        } catch (e) { console.warn('[flappy_bend] note_detect re-enable threw:', e); }
+      }
 
       const score = passed * 100 + Math.max(0, Math.round(100 - meanErrorCents));
       const summary =
@@ -995,6 +1018,14 @@
         if (goTimeout)         { clearTimeout(goTimeout);          goTimeout = null; }
         try { pitchHandle.stop(); } catch (e) {}
         try { music && music.stop(); } catch (e) {}
+        // Re-enable note_detect if we disabled it on entry.
+        if (noteDetectWasEnabled) {
+          try {
+            if (window.noteDetect && typeof window.noteDetect.enable === 'function') {
+              window.noteDetect.enable();
+            }
+          } catch (e) { console.warn('[flappy_bend] note_detect re-enable threw:', e); }
+        }
         window.removeEventListener('resize', onResize);
       },
     };
