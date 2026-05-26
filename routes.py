@@ -13,7 +13,7 @@ no symlinks escaping). Mime types are inferred from the extension.
 from pathlib import Path
 
 from fastapi import HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 
 
 _MIME_OVERRIDES = {

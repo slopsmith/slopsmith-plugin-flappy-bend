@@ -477,14 +477,11 @@
       const endS   = startAt + nextMs / 1000;
       const durS   = endS - startS;
       const quality = QUALITY[c.quality || 'maj'] || QUALITY.maj;
-      const padOctave = 60;  // middle C area
-      const padMidis = quality.map(iv => padOctave + ((c.root + iv) % 12) - (((padOctave + ((c.root + iv) % 12)) - c.root) > 12 ? 12 : 0));
-      // Simpler: place pad in fixed 4th-octave-ish window.
+      // Place pad voices in a fixed 4th-octave-ish window (MIDI 60–71).
       const padTriad = quality.map(iv => 60 + ((c.root + iv) % 12));
       pad(startS, padTriad, durS);
 
       // Walk 8th notes through the chord region.
-      let beat = 0;
       for (let t = c.t_ms; t < nextMs; t += eighth * 1000) {
         const sub  = Math.round((t - c.t_ms) / (eighth * 1000)) % 2; // 0 = downbeat, 1 = upbeat
         const beatInBar = Math.floor((t - c.t_ms) / (beatS * 1000)) % 4;
@@ -500,8 +497,6 @@
         // Bass: root on beat 1, fifth on beat 3.
         if (sub === 0 && beatInBar === 0) bass(tS, c.root - 12, beatS * 0.95);
         if (sub === 0 && beatInBar === 2) bass(tS, c.root - 12 + 7, beatS * 0.95);
-
-        beat++;
       }
     });
 
@@ -627,9 +622,15 @@
       }
     }
 
+    // Cached CSS pixel size — updated by fitCanvas() so frame() can read
+    // layout dimensions without calling getBoundingClientRect() every tick.
+    let cssW = 1, cssH = 1;
+
     function fitCanvas() {
       const r = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
+      cssW = r.width;
+      cssH = r.height;
       canvas.width  = Math.max(1, Math.floor(r.width  * dpr));
       canvas.height = Math.max(1, Math.floor(r.height * dpr));
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -741,6 +742,13 @@
 
     function startSong() {
       music = scheduleMusic(track);
+      // The setInterval countdown fires ~2 s after the original user
+      // gesture; Chrome's autoplay policy may have suspended the new
+      // AudioContext by then. Resume explicitly so backing audio plays even
+      // if the context started in the 'suspended' state.
+      if (music.audioCtx && music.audioCtx.state === 'suspended') {
+        music.audioCtx.resume().catch(() => {});
+      }
       started = true;
       startedAtMs = performance.now();
       // (raf loop is already running — see end of startGame.)
@@ -752,6 +760,10 @@
       }
       if (raf) cancelAnimationFrame(raf);
       raf = null;
+      // Cancel any pending countdown / "GO" splash timers so they can't
+      // fire into torn-down state (e.g. instant pipe hit during countdown).
+      if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+      if (goTimeout)         { clearTimeout(goTimeout);          goTimeout = null; }
       window.removeEventListener('resize', onResize);
       try { pitchHandle.stop(); } catch (e) {}
       try { music && music.stop(); } catch (e) {}
@@ -790,8 +802,9 @@
       }
 
       // Target Y from cents.
-      const r = canvas.getBoundingClientRect();
-      const W = r.width, H = r.height;
+      // Use the CSS dimensions cached by fitCanvas() — avoids a forced
+      // layout recalc on every animation frame.
+      const W = cssW, H = cssH;
       // Reserve the bottom 13% for the base tile (Flappy Bird ground).
       const baseH = Math.round(H * 0.13);
       const playTop = 0;
