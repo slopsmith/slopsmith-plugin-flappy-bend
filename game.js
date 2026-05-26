@@ -916,7 +916,9 @@
       const pipeW    = Math.round(W * 0.085);
       const gapHalf  = (GAP_CENTS / MAX_CENTS) * safeRange * 0.5;
       const birdR    = 16;  // collision radius, slightly smaller than visual
-      const playArea = { top: playTop, bottom: playBottom };
+      // Use the inset safe band (matching centsToY's coordinate space) so
+      // the ideal-bend curve and pipe gap-centers align with gameplay geometry.
+      const playArea = { top: safeTop, bottom: safeBottom };
       for (const p of pipes) {
         const dx = p.tMs - songT;
         const x = birdX + (dx / VISIBLE_MS) * (W - birdX);
