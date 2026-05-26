@@ -338,7 +338,9 @@
   let _trackCache = new Map();  // id → track.json
 
   async function loadTrackIndex() {
-    if (_trackIndex) return _trackIndex;
+    // null  = not yet loaded / failed last time → try the fetch.
+    // array = successfully loaded (may be empty if no tracks installed).
+    if (_trackIndex !== null) return _trackIndex;
     try {
       const r = await fetch(`${ASSETS}/tracks/index.json`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -346,11 +348,11 @@
       _trackIndex = j.tracks || [];
     } catch (e) {
       console.warn('[flappy_bend] track index missing:', e);
-      // Do not cache the empty result on transient failure — allow retry on
-      // next bootstrap call (e.g., if the server wasn't ready yet).
-      _trackIndex = [];
+      // Leave _trackIndex as null so a later bootstrap() call can retry
+      // (unlike an empty array, null does not satisfy the !== null guard).
+      // Return [] here so callers always get an array.
     }
-    return _trackIndex;
+    return _trackIndex || [];
   }
 
   async function loadTrack(id) {
@@ -521,7 +523,14 @@
       return;
     }
 
-    const track = await loadTrack(trackId);
+    let track;
+    try {
+      track = await loadTrack(trackId);
+    } catch (e) {
+      console.error('[flappy_bend] failed to load track:', trackId, e);
+      container.innerHTML = `<div class="text-center text-red-400 pt-20">Failed to load track &#8220;${escapeHtml(trackId)}&#8221;.</div>`;
+      return;
+    }
 
     // Stop note_detect if it's running — it owns the mic and will fight
     // us for the stream, and its matchNotes loop crashes when called
@@ -537,7 +546,7 @@
     const PIPE_SPACING_MS = ({ sparse: 1800, medium: 1100, dense: 700 })[modifiers.pipe_density] || 1100;
     const SCROLL_MULT     = ({ slow: 0.75,    normal: 1.0,   fast: 1.4   })[modifiers.scroll_speed] || 1.0;
     const VISIBLE_MS      = 3000 / SCROLL_MULT;
-    const GAP_CENTS       = 60;     // half-width of the gap in cents
+    const GAP_CENTS       = 60;     // full gap width in cents (halved in gapHalf calculation)
     const MAX_CENTS       = track.max_cents || 200;
     const BASE_FREQ       = track.instrument && track.instrument.base_freq_hz;
 
