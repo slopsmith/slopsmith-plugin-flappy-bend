@@ -77,6 +77,9 @@
       img.onerror = () => reject(new Error(`failed to load sprite ${name}`));
       img.src = `${ASSETS}/sprites/${name}.png`;
     }))).then(pairs => Object.fromEntries(pairs));
+    // Clear the cached promise on rejection so a later startGame() call
+    // can retry rather than immediately re-receiving the rejected promise.
+    _spritesPromise.catch(() => { _spritesPromise = null; });
     return _spritesPromise;
   }
 
@@ -86,8 +89,8 @@
     const bg = sprites['background-day'];
     if (!bg) { ctx.fillStyle = '#4ec0ca'; ctx.fillRect(0, 0, W, H); return; }
     // Tile background to cover canvas. Scale uniformly so the sprite
-    // height matches a comfortable proportion of the canvas (~70%) and
-    // tile horizontally with a slow parallax scroll.
+    // height matches the full canvas height and tile horizontally with
+    // a slow parallax scroll.
     const scale = H / bg.height;
     const tileW = bg.width * scale;
     const offset = ((songT * bgScrollPxPerMs * 0.18) % tileW + tileW) % tileW;
