@@ -517,7 +517,7 @@
     return {
       audioCtx,
       startAtAudioTime: startAt,
-      stop() { try { audioCtx.close(); } catch (e) {} },
+      stop() { audioCtx.close().catch(() => {}); },
     };
   }
 
@@ -795,10 +795,10 @@
       // (raf loop is already running — see end of startGame.)
     }
 
-    function endRun(reason) {
-      if (!raf && started === false) {
-        // Quit pressed before we started.
-      }
+    // Shared teardown — called from both endRun() (game over / finish) and
+    // runState.cleanup() (user pressed Quit). Keeping it in one place
+    // ensures both exit paths cancel the same resources.
+    function teardown() {
       if (raf) cancelAnimationFrame(raf);
       raf = null;
       // Cancel any pending countdown / "GO" splash timers so they can't
@@ -816,6 +816,10 @@
           }
         } catch (e) { console.warn('[flappy_bend] note_detect re-enable threw:', e); }
       }
+    }
+
+    function endRun(reason) {
+      teardown();
 
       const score = passed * 100 + Math.max(0, Math.round(100 - meanErrorCents));
       const summary =
@@ -1020,23 +1024,7 @@
 
     // Save handles so stop() can reach them.
     runState = {
-      cleanup() {
-        if (raf) cancelAnimationFrame(raf);
-        raf = null;
-        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-        if (goTimeout)         { clearTimeout(goTimeout);          goTimeout = null; }
-        try { pitchHandle.stop(); } catch (e) {}
-        try { music && music.stop(); } catch (e) {}
-        // Re-enable note_detect if we disabled it on entry.
-        if (noteDetectWasEnabled) {
-          try {
-            if (window.noteDetect && typeof window.noteDetect.enable === 'function') {
-              window.noteDetect.enable();
-            }
-          } catch (e) { console.warn('[flappy_bend] note_detect re-enable threw:', e); }
-        }
-        window.removeEventListener('resize', onResize);
-      },
+      cleanup() { teardown(); },
     };
   }
 
