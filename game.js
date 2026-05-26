@@ -677,14 +677,15 @@
     // don't force DOM updates at 60 fps.
     let _hudPassed = -1, _hudErr = '', _hudActive = null;
     function updateHud() {
-      const errStr = meanErrorCents.toFixed(0);
-      if (passed === _hudPassed && errStr === _hudErr && pitchActive === _hudActive) return;
-      _hudPassed = passed; _hudErr = errStr; _hudActive = pitchActive;
+      const errStr = errCount > 0 ? meanErrorCents.toFixed(0) : null;
+      const errDisplay = errStr !== null ? `${errStr}¢` : '—';
+      if (passed === _hudPassed && errDisplay === _hudErr && pitchActive === _hudActive) return;
+      _hudPassed = passed; _hudErr = errDisplay; _hudActive = pitchActive;
       sdk.ui.mountHUD(
         `<span class="mg-pitch-dot ${pitchActive ? 'live' : ''}"></span>` +
         `Pipes <b class="text-white">${passed}</b>` +
         `<span class="mx-2 text-gray-600">·</span>` +
-        `Err <b class="text-white">${errStr}¢</b>`
+        `Err <b class="text-white">${errDisplay}</b>`
       );
     }
 
@@ -782,7 +783,15 @@
     let music = null;
 
     function startSong() {
-      music = scheduleMusic(track);
+      try {
+        music = scheduleMusic(track);
+      } catch (e) {
+        // Web Audio unavailable or context-creation refused (e.g. browser
+        // limit or no hardware). Fall back to a no-op music object so the
+        // run continues without backing audio.
+        console.warn('[flappy_bend] scheduleMusic failed, running silent:', e);
+        music = { audioCtx: null, startAtAudioTime: 0, stop() {} };
+      }
       // The setInterval countdown fires ~2 s after the original user
       // gesture; Chrome's autoplay policy may have suspended the new
       // AudioContext by then. Resume explicitly so backing audio plays even
@@ -1068,7 +1077,7 @@
     postSpec({
       id:        PLUGIN_ID,
       title:     'Flappy Bend',
-      tagline:   'Bend strings to keep the bird airborne.',
+      tagline:   'Bend strings to keep the bird airborne',
       thumbnail: 'thumb.png',
       availableTracks: tracks,
       modifiers: [
