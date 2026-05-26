@@ -702,6 +702,13 @@
     let errCount    = 0;
     let meanErrorCents = 0;
 
+    // Tracked so cleanup() can cancel them — without this, quitting
+    // during the pre-game 3-2-1 leaves the setInterval running until it
+    // ticks down to 0 and calls startSong() against torn-down state
+    // (would leak the audio context and re-enter gameplay after stop).
+    let countdownInterval = null;
+    let goTimeout         = null;
+
     function startCountdown() {
       // Clear the instructional overlay immediately so 3-2-1 has the
       // center of the canvas to itself.
@@ -711,13 +718,14 @@
         center.innerHTML = `<div class="fb-countdown text-[160px] font-black leading-none">${s}</div>`;
       };
       popIn(n);
-      const tick = setInterval(() => {
+      countdownInterval = setInterval(() => {
         n -= 1;
         if (n <= 0) {
-          clearInterval(tick);
+          clearInterval(countdownInterval);
+          countdownInterval = null;
           center.innerHTML = `<div class="fb-go text-[120px] font-black leading-none text-cyan-200"
                                 style="text-shadow: 0 0 32px rgba(34,211,238,0.9), 0 0 8px rgba(255,255,255,0.9);">GO</div>`;
-          setTimeout(() => { center.innerHTML = ''; }, 500);
+          goTimeout = setTimeout(() => { center.innerHTML = ''; goTimeout = null; }, 500);
           startSong();
         } else {
           popIn(n);
@@ -951,6 +959,8 @@
       cleanup() {
         if (raf) cancelAnimationFrame(raf);
         raf = null;
+        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+        if (goTimeout)         { clearTimeout(goTimeout);          goTimeout = null; }
         try { pitchHandle.stop(); } catch (e) {}
         try { music && music.stop(); } catch (e) {}
         window.removeEventListener('resize', onResize);
