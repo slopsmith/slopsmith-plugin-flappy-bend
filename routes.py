@@ -38,7 +38,7 @@ _ALLOWED_ROOTS = {"sprites", "fonts", "tracks"}
 _ALLOWED_ROOT_FILES = {"thumb.png"}
 
 
-def _is_allowed(path: str, parts: tuple) -> bool:
+def _is_allowed(parts: tuple) -> bool:
     """Return True iff the normalised path is within the allowlist."""
     if len(parts) == 1:
         # Root-level file: only thumb.png is permitted.
@@ -60,7 +60,7 @@ def setup(app, context):
             raise HTTPException(status_code=400, detail="invalid path")
 
         # Allowlist check — prevents serving routes.py, plugin.json, etc.
-        if not _is_allowed(path, parts):
+        if not _is_allowed(parts):
             raise HTTPException(status_code=404, detail="not found")
 
         target = (plugin_dir / path).resolve()

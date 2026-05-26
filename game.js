@@ -45,9 +45,10 @@
       .fb-game-root,
       .fb-game-root * {
         font-family: 'Kaph', system-ui, -apple-system, sans-serif !important;
-        font-weight: 400 !important;
         /* Kaph ships in Regular + Italic only — block the browser from
-           synthesising a bold variant (looks like mush on a display font). */
+           synthesising a bold variant (looks like mush on a display font),
+           but do NOT force font-weight so Tailwind font-semibold / font-black
+           classes can still control per-element emphasis. */
         font-synthesis: none;
       }
       .fb-game-root .uppercase {
@@ -340,10 +341,13 @@
     if (_trackIndex) return _trackIndex;
     try {
       const r = await fetch(`${ASSETS}/tracks/index.json`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       _trackIndex = j.tracks || [];
     } catch (e) {
       console.warn('[flappy_bend] track index missing:', e);
+      // Do not cache the empty result on transient failure — allow retry on
+      // next bootstrap call (e.g., if the server wasn't ready yet).
       _trackIndex = [];
     }
     return _trackIndex;
